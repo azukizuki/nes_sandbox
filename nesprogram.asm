@@ -14,6 +14,7 @@
 	;bank2にリソースを定義
 	INCLUDE "resources/sprite.asm"
 
+	; bank0に切り替えて8000アドレスからプログラム領域になる
 	.bank 0
 	.org $8000
 
