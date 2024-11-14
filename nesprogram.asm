@@ -3,21 +3,16 @@
 	.inesmir 0
 	.inesmap 0
 
+	;bank1のFFFA領域にはファミコンの割り込みベクタが存在する。ここに各種ハードウェアイベントを定義する
 	.bank 1
 	.org $FFFA
 
-	.dw 0
-	.dw START
-	.dw 0
+	.dw 0 ; NMI発動時に呼び出すアドレスを指定。 NMIとは Mon-MaskableInterruptの略で、Vブランクの開始時にPPUからトリガーされる。レンダリング開始みたいなイメージ
+	.dw START ;リセットベクタ　電源入れたときとリセットボタン押したときに呼び出すアドレスを指定。ここではSTARTラベルを指定している
+	.dw 0 ;IRQ割り込みベクタ　カセットに特殊チップなど積んでると発火するとかそういう系っぽい？
 
-	; スプライトデータ（CHR-ROMに必要なデータを配置）
-	.bank 2
-	.org $0000
-    .db $3C, $42, $42, $7E, $42, $42, $42, $42,$00,$00,$00,$00,$00,$00,$00,$00
-	.db $7E, $02, $04, $08, $10, $20, $40, $7E,$00,$00,$00,$00,$00,$00,$00,$00
-	.db $42, $42, $42, $42, $42, $42, $42, $3C ,$00,$00,$00,$00,$00,$00,$00,$00
-	.db $42, $44, $48, $70, $48, $44, $42, $42 ,$00,$00,$00,$00,$00,$00,$00,$00
-	.db $3C, $08, $08, $08, $08, $08, $08, $3C , $00,$00,$00,$00,$00,$00,$00,$00
+	;bank2にリソースを定義
+	INCLUDE "resources/sprite.asm"
 
 	.bank 0
 	.org $8000
@@ -26,39 +21,28 @@ START:
 	LDA $2002
 	BPL START ; vブランクチェック
 
+	JSR RENDER_INIT_INITIALIZE ; 描画初期化
+	JSR SOUND_INIT ; サウンド初期化
 
-	; パレットの設定　ファミコンのPPUは$2006に指定したアドレスに$2007のデータを書き込むという挙動をするっぽい
-	LDA #$3F ; 上位バイト
-	STA $2006
-	LDA #$10 ; 下位バイト
-	STA $2006 ;これで書き込み先が決まる
-	
-	;ここからパレット内の色を設定していく
-	LDA #$0F ; 背景色
-	STA $2007
-	LDA #$30 ; Color1
-	STA $2007
-	LDA #$36 ; Color2
-	STA $2007
-	LDA #$11 ; Color3
-	STA $2007
+	; 4000は矩形波のch1の制御レジスタ(1)
+	LDA #%10000000 ;上位2bitがduty比3bit目が長さの有効無効フラグ,4bit目が減衰の切り替えフラグ,5~8bit目で減衰率
+	STA $4000
 
-	;PPUコントロールレジスタを設定する
-	;これでスプライトパターンテーブル0を使用するってことになるらしい
-	lda #%00000000
-	STA $2000
-	;PPUマスクレジスタを設定する
-	;1になってるビットが「Sprite有効化」フラグ
-	LDA #%00010000
-	STA $2001
+	; 4001は矩形波のch1の制御レジスタ(2)
+	LDA #%00001111 ;上位1bitでスイーブの有効無効,2~4bitで変化率,5bitで方向,残り3bitで変化量
+	STA $4001
 
-	;OAMアドレスを初期化する
-	LDA #0
-	STA $2003
+	; 周波数の上位バイト
+	LDA #$40
+	STA $4002
+
+	; 周波数の下位バイト + 長さ
+	LDA #$02
+	STA $4003
+
 
 LOOP:
-	JSR UPDATE_INPUT_STATE
-	
+	JSR INPUT_UPDATE_INPUT_STATE
 	LDA $20
 	BEQ RELEASE_A
 	JSR PRESS_A
@@ -92,8 +76,11 @@ RELEASE_LEFT:
 	JSR PRESS_RIGHT
 RELEASE_RIGHT:
 
-
 	JMP LOOP ; メインループへ戻る
+
+	INCLUDE "input.asm"
+	INCLUDE "render_init.asm"
+	INCLUDE "sound.asm"
 
 
 ; LDA = PosY
@@ -111,31 +98,6 @@ DRAW_SPRITE:
 	STA $2004
 	;x座標
 	STX $2004
-
-	RTS
-
-
-;コントローラの入力を管理するルーチン
-; $20から + 8までのアドレスに入力状態をセットする
-; 20から A,B, Select , Start ,Up, Down ,Left , Rightの順で入る
-UPDATE_INPUT_STATE:
-	;4016に01を書き込むとコントローラの入力状態をリセットする
-	LDA #$01
-	STA $4016
-	;0を書き込んで読み出しを有効化
-	LDA #$00
-	STA $4016
-
-	LDY #$00 ;インデックスとしてYレジスタを使う
-
-GET_BUTTON_STATE:
-	LDA $4016
-	AND #$01
-
-	STA $20,Y
-	INY
-	CPY #$08
-	BNE GET_BUTTON_STATE
 
 	RTS
 
