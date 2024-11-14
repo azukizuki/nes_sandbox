@@ -7,7 +7,7 @@
 	.bank 1
 	.org $FFFA
 
-	.dw 0 ; NMI発動時に呼び出すアドレスを指定。 NMIとは Mon-MaskableInterruptの略で、Vブランクの開始時にPPUからトリガーされる。レンダリング開始みたいなイメージ
+	.dw ON_NMI ; NMI発動時に呼び出すアドレスを指定。 NMIとは Mon-MaskableInterruptの略で、Vブランクの開始時にPPUからトリガーされる。レンダリング開始みたいなイメージ
 	.dw START ;リセットベクタ　電源入れたときとリセットボタン押したときに呼び出すアドレスを指定。ここではSTARTラベルを指定している
 	.dw 0 ;IRQ割り込みベクタ　カセットに特殊チップなど積んでると発火するとかそういう系っぽい？
 
@@ -19,6 +19,7 @@
 	.org $8000
 
 START:
+	
 	LDA $2002
 	BPL START ; vブランクチェック
 
@@ -40,6 +41,7 @@ START:
 	; 周波数の下位バイト + 長さ
 	LDA #$02
 	STA $4003
+
 
 
 LOOP:
@@ -77,7 +79,14 @@ RELEASE_LEFT:
 	JSR PRESS_RIGHT
 RELEASE_RIGHT:
 
+
 	JMP LOOP ; メインループへ戻る
+
+
+ON_NMI:
+	RTS
+	
+
 
 	INCLUDE "input.asm"
 	INCLUDE "render_init.asm"
