@@ -1,6 +1,6 @@
 ;コントローラの入力を管理するルーチン
-; $20から + 8までのアドレスに入力状態をセットする
-; 20から A,B, Select , Start ,Up, Down ,Left , Rightの順で入る
+; $0020に入力状態を8bitでセットする
+; A,B, Select , Start ,Up, Down ,Left , Rightの順
 INPUT_UPDATE_INPUT_STATE:
 	;4016に01を書き込むとコントローラの入力状態をリセットする
 	LDA #$01
@@ -8,16 +8,12 @@ INPUT_UPDATE_INPUT_STATE:
 	;0を書き込んで読み出しを有効化
 	LDA #$00
 	STA $4016
-
-	LDY #$00 ;インデックスとしてYレジスタを使う
+	LDX #$08
 
 INPUT_GET_BUTTON_STATE:
-	LDA $4016
-	AND #$01
-
-	STA $0020,Y
-	INY
-	CPY #$08
-	BNE INPUT_GET_BUTTON_STATE
-
+	LDA $4016 ; Aレジスタにコントローラの入力状態をセット（８回ループするたびに違うボタンの情報が入る）
+	LSR A ;最下位のビットが「押されているか」という判定なので、あえてLSRで右シフトさせて桁溢れを起こし、キャリーフラグに結果を格納させる
+	ROL $0020 ; ROLで$0020を左にローテートさせる。これによりキャリーフラグに入っている該当ボタンの押下情報が最下位ビットに入る
+	DEX;ループ用のインデックスを減算
+	BNE INPUT_GET_BUTTON_STATE ;回数が0になるまでループさせる
 	RTS
